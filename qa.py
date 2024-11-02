@@ -38,8 +38,8 @@ def read_squad(path):
                 })
     return data
 
-train_data = read_squad('train-v1.1.json')
-dev_data = read_squad('dev-v1.1.json')
+train_data = read_squad('data/train-v1.1.json')
+dev_data = read_squad('data/dev-v1.1.json')
 
 # Create a custom dataset
 class SquadDataset(Dataset):
