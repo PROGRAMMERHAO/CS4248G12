@@ -12,6 +12,11 @@ from torch.amp import autocast, GradScaler  # Updated imports for mixed precisio
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f'Using device: {device}')
 
+# if using cuda, clear the cache first
+if device == 'cuda':
+    torch.cuda.empty_cache()
+    print('Cache cleared')
+
 # Load the data
 def read_squad(path):
     with open(path, 'r') as f:
@@ -168,7 +173,7 @@ with torch.no_grad():
         context = item['context']
         qid = item['qid']
         input_text = f"Question: {question}\nContext: {context}\nAnswer:"
-        input_ids = tokenizer.encode(input_text, return_tensors='pt', truncation=True, max_length=1024).to(device)
+        input_ids = tokenizer.encode(input_text, return_tensors='pt', truncation=True, max_length=256).to(device)
 
         # Generate answer
         output_ids = model.generate(
