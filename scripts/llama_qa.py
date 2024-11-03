@@ -4,6 +4,7 @@ import json
 import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import LlamaTokenizer, LlamaForCausalLM, AdamW, get_linear_schedule_with_warmup
+from transformers import AutoTokenizer
 from tqdm import tqdm
 import collections
 import os
@@ -89,8 +90,8 @@ class SquadDataset(Dataset):
         return self.examples[idx]
 
 # Initialize tokenizer and model
-tokenizer = LlamaTokenizer.from_pretrained('meta-llama/Llama-2-7b-hf')
-model = LlamaForCausalLM.from_pretrained('meta-llama/Llama-2-7b-hf')
+tokenizer = LlamaTokenizer.from_pretrained('Llama-3.2-3B')
+model = LlamaForCausalLM.from_pretrained('Llama-3.2-3B')
 
 # Set the pad_token_id
 tokenizer.pad_token = tokenizer.eos_token
