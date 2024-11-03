@@ -271,7 +271,7 @@ with torch.no_grad():
             predictions[item['qid']] = best_answer
 
 # Save predictions to a JSON file
-with open('distilled_predictions.json', 'w') as f:
+with open('../eval/distilled_predictions.json', 'w') as f:
     json.dump(predictions, f)
 
 print('Predictions saved to distilled_predictions.json')
