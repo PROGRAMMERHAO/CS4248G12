@@ -25,8 +25,7 @@ def read_squad(path):
                 qid = qa['id']
                 answers = qa['answers']
                 if len(answers) == 0:
-                    # Skip unanswerable questions
-                    continue
+                    continue  # Skip unanswerable questions
                 answer_text = answers[0]['text']
                 answer_start = answers[0]['answer_start']
                 data.append({
@@ -67,12 +66,11 @@ class SquadDataset(Dataset):
                 token_type_ids = inputs['token_type_ids'][i]
                 offsets = offset_mapping[i]
                 sample_idx = sample_mapping[i]
-                # Find start and end token positions
                 cls_index = input_ids.index(tokenizer.cls_token_id)
                 sequence_ids = inputs.sequence_ids(i)
                 context_start = sequence_ids.index(1)
                 context_end = len(sequence_ids) - sequence_ids[::-1].index(1)
-                # Adjust answer positions
+                
                 if not (start_char >= offsets[context_start][0] and end_char <= offsets[context_end - 1][1]):
                     start_positions = cls_index
                     end_positions = cls_index
@@ -122,6 +120,12 @@ scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_t
 scheduler = get_cosine_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=total_steps)
 
 epoch_num = 3
+best_loss = float("inf")  # Initialize best loss
+
+# Directory to save the best model
+best_model_directory = '../models/fine_tuned_model'
+if not os.path.exists(best_model_directory):
+    os.makedirs(best_model_directory)
 
 # Training loop
 model.train()
@@ -148,24 +152,28 @@ for epoch in range(epoch_num):
         optimizer.step()
         scheduler.step()
 
-        loop.set_postfix(loss=loss.item())
+        current_loss = loss.item()
+        loop.set_postfix(loss=current_loss)
+        
+        # Save the model if this is the lowest loss observed so far
+        if current_loss < best_loss:
+            best_loss = current_loss
+            model.save_pretrained(best_model_directory)
+            tokenizer.save_pretrained(best_model_directory)
+            print(f"New best model saved with loss {best_loss:.4f} at {best_model_directory}")
 
-# Define a directory to save the model and tokenizer
-save_directory = '../models/fine_tuned_model'
+# Define a directory to save the final model and tokenizer
+final_save_directory = '../models/fine_tuned_model'
+if not os.path.exists(final_save_directory):
+    os.makedirs(final_save_directory)
 
-# Check if the directory exists, if not, create it
-if not os.path.exists(save_directory):
-    os.makedirs(save_directory)
+# Save the final model
+model.save_pretrained(final_save_directory)
+tokenizer.save_pretrained(final_save_directory)
 
-# Save the model
-model.save_pretrained(save_directory)
+print(f'Model and tokenizer saved to {final_save_directory}')
 
-# Save the tokenizer
-tokenizer.save_pretrained(save_directory)
-
-print(f'Model and tokenizer saved to {save_directory}')
-
-# prediction code
+# Prediction code and saving predictions to JSON
 model.eval()
 predictions = collections.OrderedDict()
 with torch.no_grad():
@@ -196,15 +204,11 @@ with torch.no_grad():
 
         # For each input
         for i in range(len(input_ids)):
-            # Offset mappings
             offsets = offset_mapping[i]
-            # Get the most probable start and end of answer span
             start_logit = start_logits[i]
             end_logit = end_logits[i]
-            # Convert to probabilities
             start_indexes = torch.argsort(start_logit, descending=True)[:20]
             end_indexes = torch.argsort(end_logit, descending=True)[:20]
-            # Generate possible answer spans
             context = item['context']
             valid_answers = []
             for start_index in start_indexes:
