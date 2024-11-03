@@ -1,5 +1,3 @@
-# llama_qa_system.py
-
 import json
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -8,6 +6,7 @@ from transformers import AutoTokenizer
 from tqdm import tqdm
 import collections
 import os
+from torch.amp import autocast, GradScaler  # Updated imports for mixed precision
 
 # Check if GPU is available
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -89,14 +88,11 @@ class SquadDataset(Dataset):
     def __getitem__(self, idx):
         return self.examples[idx]
 
-# Initialize tokenizer and model
-tokenizer = LlamaTokenizer.from_pretrained('Llama-3.2-3B')
-model = LlamaForCausalLM.from_pretrained('Llama-3.2-3B')
-
-# Set the pad_token_id
+# Load tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained('meta-llama/Llama-3.2-3B', use_fast=True)
+model = LlamaForCausalLM.from_pretrained('meta-llama/Llama-3.2-3B')
 tokenizer.pad_token = tokenizer.eos_token
 model.config.pad_token_id = tokenizer.eos_token_id
-
 model.to(device)
 
 # DataLoaders
@@ -110,8 +106,9 @@ optimizer = AdamW(model.parameters(), lr=3e-5)
 total_steps = len(train_loader) * 3  # for 3 epochs
 scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=total_steps)
 
-epoch_num = 3
-best_loss = float("inf")  # Initialize best loss
+# Mixed precision training
+scaler = GradScaler(device='cuda')  # Updated GradScaler syntax
+accumulation_steps = 4  # Increase accumulation to reduce batch memory
 
 # Directory to save the best model
 best_model_directory = '../models/llama_model'
@@ -120,26 +117,30 @@ if not os.path.exists(best_model_directory):
 
 # Training loop with best model saving
 model.train()
-for epoch in range(epoch_num):
-    print(f'Epoch {epoch + 1}/{epoch_num}')
+best_loss = float("inf")
+for epoch in range(3):
+    print(f'Epoch {epoch + 1}/3')
     loop = tqdm(train_loader, leave=True)
-    for batch in loop:
-        optimizer.zero_grad()
+    for i, batch in enumerate(loop):
         input_ids = batch['input_ids'].to(device)
         attention_mask = batch['attention_mask'].to(device)
         labels = batch['labels'].to(device)
+        
+        # Mixed precision
+        with autocast(device_type='cuda'):  # Updated autocast syntax
+            outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
+            loss = outputs.loss / accumulation_steps
+        
+        # Scale and backpropagate
+        scaler.scale(loss).backward()
 
-        outputs = model(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            labels=labels,
-        )
-        loss = outputs.loss
-        loss.backward()
-        optimizer.step()
-        scheduler.step()
+        if (i + 1) % accumulation_steps == 0:
+            scaler.step(optimizer)
+            scaler.update()
+            optimizer.zero_grad()
+            scheduler.step()
 
-        current_loss = loss.item()
+        current_loss = loss.item() * accumulation_steps
         loop.set_postfix(loss=current_loss)
 
         # Save the model if this is the lowest loss observed so far
@@ -149,12 +150,10 @@ for epoch in range(epoch_num):
             tokenizer.save_pretrained(best_model_directory)
             print(f"New best model saved with loss {best_loss:.4f} at {best_model_directory}")
 
-# Define a directory to save the final model
+# Save the final model
 final_save_directory = '../models/llama_model'
 if not os.path.exists(final_save_directory):
     os.makedirs(final_save_directory)
-
-# Save the final model
 model.save_pretrained(final_save_directory)
 tokenizer.save_pretrained(final_save_directory)
 
@@ -191,6 +190,8 @@ with torch.no_grad():
         predictions[qid] = answer
 
 # Save predictions to a JSON file
+if not os.path.exists('../eval'):
+    os.makedirs('../eval')
 with open('../eval/llama_predictions.json', 'w') as f:
     json.dump(predictions, f)
 

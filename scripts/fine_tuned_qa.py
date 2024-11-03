@@ -123,7 +123,7 @@ epoch_num = 3
 best_loss = float("inf")  # Initialize best loss
 
 # Directory to save the best model
-best_model_directory = '../models/best_fine_tuned_model'
+best_model_directory = '../models/fine_tuned_model'
 if not os.path.exists(best_model_directory):
     os.makedirs(best_model_directory)
 
