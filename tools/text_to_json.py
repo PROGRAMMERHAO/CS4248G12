@@ -3,13 +3,12 @@ import json
 def txt_to_json(txt_file, json_file):
     data = {}
     
-    with open(txt_file, 'r', encoding='utf-8') as file:
+    with open(txt_file, 'r') as file:
         for line in file:
             # Remove any whitespace or newline characters from the line
             line = line.strip()
             if line:
                 # Split line into key and value based on ':' separator
-                print(line)
                 key, value = line.split(":", 1)
                 data[key.strip()] = value.strip()
 
