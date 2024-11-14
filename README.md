@@ -117,6 +117,10 @@ This command will compute evaluation metrics on the development set (`dev-v1.1.j
 - **scripts/**: Contains all scripts, including training and CUDA setup scripts.
   - `cuda.py`: Checks CUDA availability.
   - `student_teacher_qa.py`: Main script for training with knowledge distillation.
+  - `fine_tuned_bert.py`: Main script for training BERT without mixed precision.
+  - `fine_tuned_albert_xlarge_nomix.py`: Main script for training ALBERT-xlarge without mixed precision.
+  - `fine_tuned_albert_xlarge_mix.py`: Main script for training ALBERT-xlarge with mixed precision.
+  - `albert_prediction`: Script for running predictions on dataset using pretrained models.
   - `langchain_qa.py`: Script for ChatBot-based QA prediction.
 - **eval/**: Folder for evaluation scripts and results.
   - `evaluate-v2.0.py`: Script to evaluate predictions against ground truth.
