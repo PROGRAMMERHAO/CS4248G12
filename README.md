@@ -65,11 +65,42 @@ python scripts/student_teacher_qa.py
 
 This will train the student model using the knowledge distillation approach and save the output model to `models/distilled_model`.
 
-### 7. Run Evaluation
+Run `fine_tuned_albert_xlarge_mix.py` to train the model with mixed precision. This script will save the fine-tuned model into a new folder within `models`:
+
+```bash
+python scripts/fine_tuned_albert_xlarge_mix.py
+```
+
+Run `fine_tuned_albert_xlarge_nomix.py` to train the model with mixed precision. This script will save the fine-tuned model into a new folder within `models`:
+
+```bash
+python scripts/fine_tuned_albert_xlarge_mix.py
+```
+
+### 7. Run Predictions
+
+Although the training scripts will run the predictions automatically, if you want to use our pretrained models:
+
+1. Make sure you have the relevant model folder under `models`.
+2. Change the model you want to load in `scripts/albert_prediction.py` where tokenizer and model are initialized. For example, to load ALBERT-xlarge model pretrained without mixed precision,
+```
+tokenizer = AlbertTokenizerFast.from_pretrained('../models/fine_tuned_albert_xlarge_nomix_model')
+model = AlbertForQuestionAnswering.from_pretrained('../models/fine_tuned_albert_xlarge_nomix_model')
+```
+
+Run `scripts/albert_prediction.py` to load the models and carry out predictions
+
+```bash
+python scripts/albert_prediction.py
+```
+
+
+
+### 8. Run Evaluation
 
 To evaluate the fine-tuned model, use the `evaluate-v2.0.py` script in the `eval` folder:
 
-1. Ensure that `student_teacher_qa.py` has saved predictions to `eval/fine_tuned_predictions.json`.
+1. Ensure that `student_teacher_qa.py` (or any other script from the training section) has saved predictions to `eval/fine_tuned_predictions.json`.
 2. Run the following command to evaluate the model’s performance:
 
    ```bash
