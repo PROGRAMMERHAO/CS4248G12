@@ -86,8 +86,11 @@ This command will compute evaluation metrics on the development set (`dev-v1.1.j
 - **scripts/**: Contains all scripts, including training and CUDA setup scripts.
   - `cuda.py`: Checks CUDA availability.
   - `student_teacher_qa.py`: Main script for training with knowledge distillation.
+  - `langchain_qa.py`: Script for ChatBot-based QA prediction.
 - **eval/**: Folder for evaluation scripts and results.
   - `evaluate-v2.0.py`: Script to evaluate predictions against ground truth.
+- **tools/**: Folder for supplementary tools.
+  - `text_to_json.py`: Script to convert predictions saved in txt format into json format for evaluation purpose.
 - **requirements.txt**: Lists all required Python packages.
 
 ## Notes
