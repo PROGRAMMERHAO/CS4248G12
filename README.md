@@ -1,9 +1,5 @@
 # CS4248G12 Project
 
-Here's the updated README with instructions to change to the `src` directory for evaluation and inference:
-
----
-
 # NLP Model Evaluation and Fine-tuning Project
 
 This project is dedicated to evaluating, fine-tuning, and experimenting with multiple NLP models, including ALBERT, Llama, and BERT. The repository contains datasets, model checkpoints, prediction outputs, and development scripts to facilitate NLP question answering task on the SQuAD dataset.
@@ -25,7 +21,7 @@ This project is dedicated to evaluating, fine-tuning, and experimenting with mul
 
 ## Project Overview
 
-This repository includes tools for fine-tuning, and evaluating NLP models, with a focus on performance optimization. Our model SplaxBERT is obtained from the fine-tuning of ALBERT-xlarge with mixed precision training and context-splitting. This project enables model comparison through cross-attention techniques, highway layer addition, and other fine-tuning strategies.
+This repository includes tools for fine-tuning, and evaluating NLP models, with a focus on performance optimization. Our model SplaXBERT is obtained from the fine-tuning of ALBERT-xlarge with mixed precision training and context-splitting. This project enables model comparison through cross-attention techniques, highway layer addition, and other fine-tuning strategies.
 
 ## Folder Structure
 ```
