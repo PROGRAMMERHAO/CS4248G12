@@ -141,6 +141,7 @@ Utility functions to support various operations across scripts and model code.
 To set up the project, clone the repository and install the required dependencies:
 
 ```bash
+git clone https://github.com/PROGRAMMERHAO/CS4248G12.git
 cd CS4248G12
 pip install -r requirements.txt
 ```
