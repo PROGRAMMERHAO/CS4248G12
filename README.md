@@ -1,139 +1,199 @@
 # CS4248G12 Project
 
-This project sets up a question-answering system using knowledge distillation to fine-tune a smaller model based on a larger pre-trained model's outputs. It includes data processing, model training, and evaluation.
+Here's the updated README with instructions to change to the `src` directory for evaluation and inference:
 
-## Setup Guide
+---
 
-### 1. Clone the Repository
+# NLP Model Evaluation and Fine-tuning Project
 
-Clone the repository to your local machine:
+This project is dedicated to evaluating, fine-tuning, and experimenting with multiple NLP models, including ALBERT, Llama, and BERT. The repository contains datasets, model checkpoints, prediction outputs, and development scripts to facilitate NLP question answering task on the SQuAD dataset.
+
+## Table of Contents
+
+- [Project Overview](#project-overview)
+- [Folder Structure](#folder-structure)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Data Preparation](#data-preparation)
+  - [Model Training and Fine-tuning](#model-training-and-fine-tuning)
+  - [Evaluation](#evaluation)
+  - [Inference](#inference)
+- [Development Scripts](#development-scripts)
+
+
+---
+
+## Project Overview
+
+This repository includes tools for fine-tuning, and evaluating NLP models, with a focus on performance optimization. Our model SplaxBERT is obtained from the fine-tuning of ALBERT-xlarge with mixed precision training and context-splitting. This project enables model comparison through cross-attention techniques, highway layer addition, and other fine-tuning strategies.
+
+## Folder Structure
+```
+NLP Project
+├── data/
+│   ├── dev-v1.1.json
+│   ├── dev-v2.0.json
+│   ├── train-v1.1.json
+│   └── train-v2.0.json
+│
+├── eval/
+│   ├── albert_predictions.json
+│   ├── albert_refine_predictions.json
+│   ├── distilled_predictions.json
+│   ├── fine_tuned_albert_base_predictions.json
+│   ├── fine_tuned_albert_predictions.json
+│   ├── fine_tuned_predictions_albert_new.json
+│   ├── fine_tuned_predictions_albert.json
+│   ├── fine_tuned_predictions_bert.json
+│   └── SplaxBERT_prediction.json
+│
+├── models/
+│   ├── fine_tuned_albert_base_model/
+│   ├── fine_tuned_albert_model/
+│   ├── fine_tuned_albert_with_cross_attention_model/
+│   ├── fine_tuned_albert_xlarge_mix_2_model/
+│   ├── fine_tuned_albert_xlarge_model/
+│   ├── fine_tuned_albert_xlarge_nomix_model/
+│   ├── fine_tuned_albert_xlarge_rly_mix_model/
+│   ├── fine_tuned_model_bert/
+│   └── SplaxBERT_model/
+│
+├── scripts/                # Development scripts
+│   ├── alternative studies/
+│   │   ├── fine_tuned_albert_with_cross_attention.py
+│   │   ├── fine_tuned_albert_with_highway.py
+│   │   ├── hybert_architecture.py
+│   │   └── voting.py
+│   ├── albert_inference_pipeline.py
+│   ├── context_split_grid_search.py
+│   ├── fine_tuned_albert_base_qa.py
+│   ├── fine_tuned_albert_xlarge_wo_mix.py
+│   ├── fine_tuned_bert.py
+│   ├── grid_search_results.csv
+│   ├── langchain_qa.py
+│   ├── llama_qa.py
+│   ├── prediction.py
+│   ├── student_teacher_bert_qa.py
+│   └── student_teacher_qa.py
+│
+├── src/                    # Actual production models
+│   ├── albert_inference_pipeline_with_context_splitting.py
+│   └── fine_tuned_albert_xlarge_with_mix.py
+│
+├── utils/
+│
+├── .gitignore
+├── README.md
+└── requirements.txt
+
+```
+
+### disclaimer
+The file structure has been changed for the purpose of submission, please check the path before running the scripts.
+
+### `data/`
+Contains the datasets used for model training and evaluation.
+- `dev-v1.1.json`, `dev-v2.0.json`: Development sets for model testing.
+- `train-v1.1.json`, `train-v2.0.json`: Training datasets.
+
+### `eval/`
+Holds prediction outputs and evaluation results from various models.
+We have done a lot of predictions and the names are self-explanatory.
+- `evaluate-v2.0.py`: Evaluation script for the exact match and F1 scores on the dataset.
+
+### `models/`
+We have tested a lot of models, here are some sample models shown due to size constraints. Stores fine-tuned model checkpoints for various versions and configurations.
+- `fine_tuned_albert_base_model`: Base version of the fine-tuned ALBERT model.
+- `fine_tuned_albert_with_cross_attention_model`: Fine-tuned ALBERT model with cross-attention configuration.
+- `fine_tuned_bert_model`: Fine-tuned BERT model.
+- `fine_tuned_albert_xlarge_wo_mix_model`: Fine-tuned ALBERT-xlarge model.
+-  `SplaxBERT_model`: Fine-tuned SplaxBERT model.
+
+### `src/`
+Contains the actual model code used for production and inference.
+- `albert_inference_pipeline_with_context_splitting.py`: Main pipeline for inference with context-splitting functionality.
+- `fine_tuned_albert_xlarge_mix.py`: Code for fine-tuning ALBERT-xlarge model with mixed precision.
+
+### `scripts/`
+Contains development scripts used during the experimentation and fine-tuning process.
+- `albert_inference_pipeline.py`: Pipeline for running inference using the ALBERT model (development version).
+- `context_split_grid_search.py`: Script to perform grid search on different context spliting configurations.
+- `fine_tuned_albert_base_qa.py`: Script for fine-tuning the base ALBERT model.
+- `fine_tuned_albert_xlarge_wo_mix.py`: Script for fine-tuning the ALBERT model without mixing.
+- `fine_tuned_bert_qa.py`: Script for fine-tuning the BERT model.
+- `student_teacher_bert.py`, `student_teacher_qa.py`: Scripts for implementing student-teacher training techniques.
+- `langchain_qa.py`: Script for direct prompting based on Llama.
+- `llama_qa.py`: Script for promtp chaining with few-shot prompting based on Llama.
+
+#### `scripts/alternative studies/`
+Contains scripts for alternative model studies and experiments.
+- `fine_tuned_albert_with_cross_attention.py`: Fine-tuning ALBERT model with cross-attention.
+- `fine_tuned_albert_with_highway.py`: Fine-tuning ALBERT model with highway layers.
+
+### `utils/`
+Utility functions to support various operations across scripts and model code.
+- `albert_prediction.py`: Utility functions for generating predictions using the pretrained ALBERT-base model.
+- `albert_with_highway_precision.py`: Utility functions for generating predictions using the pretrained ALBERT-base model with highway layer.
+- `bert_prediction.py`: Utility functions for generating predictions using the pretrained BERT model.
+- `test_cuda.py`: Utility functions for testing CUDA availability.
+- `test_model_loading.py`: Utility functions for testing model loading.
+- `text_to_json.py`: Utility functions for converting text to JSON format.
+---
+
+## Installation
+
+To set up the project, clone the repository and install the required dependencies:
 
 ```bash
-git clone https://github.com/PROGRAMMERHAO/CS4248G12.git
 cd CS4248G12
-```
-
-### 2. Set Up Virtual Environment
-
-Create and activate a virtual environment to manage dependencies:
-
-```bash
-python -m venv env
-source env/bin/activate       # On MacOS/Linux
-.\env\Scripts\activate        # On Windows
-```
-
-### 3. Install Required Packages
-
-Install the necessary dependencies listed in `requirements.txt`:
-
-```bash
 pip install -r requirements.txt
 ```
 
-### 4. Configure CUDA
+Ensure you have the necessary environment setup, including Python and any required libraries as specified in `requirements.txt`.
 
-If you have a CUDA-compatible GPU, set it up for faster training:
+## Usage
 
-1. Navigate to the `scripts` folder:
+### Data Preparation
 
-   ```bash
-   cd scripts
-   ```
+Place your training and evaluation datasets in the `data/` folder. Update paths in the relevant scripts if necessary.
 
-2. Run `cuda.py` to verify CUDA setup:
+### Model Training and Fine-tuning
 
-   ```bash
-   python cuda.py
-   ```
-
-   Ensure CUDA is detected. This step enables training on GPU if available.
-
-### 5. Create Training Scripts
-
-Prepare your training scripts within the `scripts` folder. For this project, the training scripts are already included. The main script, `student_teacher_qa.py`, trains a student model using knowledge distillation from a larger teacher model.
-
-For training and evaluation, you can either run or create your own scripts following the format of `fine_tuned_qa.py` or `student_teacher_qa.py`. These scripts provide structured setups for both fine-tuning and knowledge distillation processes and include saving the model and predictions in appropriate directories.
-
-### 6. Train the Model
-
-Run `student_teacher_qa.py` to train the model. This script will save the fine-tuned model into a new folder within `models`:
+Use scripts in the `src/` folder to run the main models for production or experimental pipelines. For example:
 
 ```bash
-python scripts/student_teacher_qa.py
+cd src
+python fine_tuned_albert_xlarge_with_mix.py
 ```
 
-This will train the student model using the knowledge distillation approach and save the output model to `models/distilled_model`.
+This script will fine-tune the ALBERT-xlarge model with mixed precision. It will also run prediction on testing dataset and save the results in the eval folder.
 
-Run `fine_tuned_albert_xlarge_mix.py` to train the model with mixed precision. This script will save the fine-tuned model into a new folder within `models`:
+### Evaluation
+
+To evaluate the model, navigate to the `src` directory first, then run the evaluation script:
 
 ```bash
-python scripts/fine_tuned_albert_xlarge_mix.py
+python eval/evaluate-v2.0.py data/dev-v1.1.json eval/fine_tuned_predictions.json
 ```
 
-Run `fine_tuned_albert_xlarge_nomix.py` to train the model with mixed precision. This script will save the fine-tuned model into a new folder within `models`:
+### Inference
+
+Run inference on your dataset by navigating to the `src` directory and using the production pipeline:
 
 ```bash
-python scripts/fine_tuned_albert_xlarge_mix.py
+cd src
+python albert_inference_pipeline_with_context_splitting.py
 ```
 
-### 7. Run Predictions
+## Development Scripts
 
-Although the training scripts will run the predictions automatically, if you want to use our pretrained models:
+The `scripts/` folder contains additional development scripts for experimentation, testing, and fine-tuning.
 
-1. Make sure you have the relevant model folder under `models`.
-2. Change the model you want to load in `scripts/albert_prediction.py` where tokenizer and model are initialized. For example, to load ALBERT-xlarge model pretrained without mixed precision,
-```
-tokenizer = AlbertTokenizerFast.from_pretrained('../models/fine_tuned_albert_xlarge_nomix_model')
-model = AlbertForQuestionAnswering.from_pretrained('../models/fine_tuned_albert_xlarge_nomix_model')
-```
-
-Run `scripts/albert_prediction.py` to load the models and carry out predictions
+To fine tune a model, use:
 
 ```bash
-python scripts/albert_prediction.py
+cd scripts
+python fine_tuned_albert_base_qa.py
 ```
+Other scripts have similar usage.
 
-
-
-### 8. Run Evaluation
-
-To evaluate the fine-tuned model, use the `evaluate-v2.0.py` script in the `eval` folder:
-
-1. Ensure that `student_teacher_qa.py` (or any other script from the training section) has saved predictions to `eval/fine_tuned_predictions.json`.
-2. Run the following command to evaluate the model’s performance:
-
-   ```bash
-   python eval/evaluate-v2.0.py data/dev-v1.1.json eval/fine_tuned_predictions.json
-   ```
-
-This command will compute evaluation metrics on the development set (`dev-v1.1.json`) and output the results to the console.
-
-## Project Structure
-
-- **data/**: Contains training and development data files.
-- **env/**: Virtual environment directory (generated after setup).
-- **models/**: Directory for saving trained models. Models are saved in subfolders like `models/distilled_model`.
-- **scripts/**: Contains all scripts, including training and CUDA setup scripts.
-  - `cuda.py`: Checks CUDA availability.
-  - `student_teacher_qa.py`: Main script for training with knowledge distillation.
-  - `fine_tuned_bert.py`: Main script for training BERT without mixed precision.
-  - `fine_tuned_albert_xlarge_nomix.py`: Main script for training ALBERT-xlarge without mixed precision.
-  - `fine_tuned_albert_xlarge_mix.py`: Main script for training ALBERT-xlarge with mixed precision.
-  - `albert_prediction`: Script for running predictions on dataset using pretrained models.
-  - `langchain_qa.py`: Script for ChatBot-based QA prediction.
-- **eval/**: Folder for evaluation scripts and results.
-  - `evaluate-v2.0.py`: Script to evaluate predictions against ground truth.
-- **tools/**: Folder for supplementary tools.
-  - `text_to_json.py`: Script to convert predictions saved in txt format into json format for evaluation purpose.
-- **requirements.txt**: Lists all required Python packages.
-
-## Notes
-
-- Make sure to run scripts in the appropriate directories as specified in each step.
-- For best performance, run on a machine with a CUDA-compatible GPU.
-- The `student_teacher_qa.py` script will create the necessary directories if they don’t already exist, so no manual folder creation is necessary.
-
-## License
-
-This project is developed for educational purposes in CS4248 at NUS. Please adhere to your institution's guidelines for code usage and submission policies.

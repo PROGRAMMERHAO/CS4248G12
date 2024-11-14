@@ -94,8 +94,8 @@ class SquadDataset(Dataset):
         return self.examples[idx]
 
 # Load tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained('meta-llama/Llama-3.2-3B', use_fast=True)
-model = LlamaForCausalLM.from_pretrained('meta-llama/Llama-3.2-3B')
+tokenizer = AutoTokenizer.from_pretrained('meta-llama/Meta-Llama-3-8B', use_fast=True)
+model = LlamaForCausalLM.from_pretrained('meta-llama/Meta-Llama-3-8B')
 tokenizer.pad_token = tokenizer.eos_token
 model.config.pad_token_id = tokenizer.eos_token_id
 model.to(device)
