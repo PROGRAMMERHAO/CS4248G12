@@ -1,12 +1,15 @@
 # qa_system.py
 
+import os
 import json
 import torch
-from torch.utils.data import Dataset, DataLoader
-from transformers import BertTokenizerFast, BertForQuestionAnswering, AdamW, get_linear_schedule_with_warmup, get_cosine_schedule_with_warmup
-from tqdm import tqdm
 import collections
-import os
+from tqdm import tqdm
+from transformers import BertTokenizerFast, BertModel, BertForQuestionAnswering, AdamW, get_linear_schedule_with_warmup
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import Dataset, DataLoader
+from torch.nn import CrossEntropyLoss
 
 # Check if GPU is available
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -68,10 +71,18 @@ class SquadDataset(Dataset):
                 sample_idx = sample_mapping[i]
                 cls_index = input_ids.index(tokenizer.cls_token_id)
                 sequence_ids = inputs.sequence_ids(i)
-                context_start = sequence_ids.index(1)
-                context_end = len(sequence_ids) - sequence_ids[::-1].index(1)
-                
-                if not (start_char >= offsets[context_start][0] and end_char <= offsets[context_end - 1][1]):
+
+                # Find the start and end of the context in the input_ids
+                context_start = 0
+                while context_start < len(sequence_ids) and sequence_ids[context_start] != 1:
+                    context_start += 1
+                context_end = len(sequence_ids) - 1
+                while context_end >= 0 and sequence_ids[context_end] != 1:
+                    context_end -= 1
+                if context_start > context_end:
+                    continue  # Skip if context not found
+
+                if not (start_char >= offsets[context_start][0] and end_char <= offsets[context_end][1]):
                     start_positions = cls_index
                     end_positions = cls_index
                 else:
@@ -101,15 +112,71 @@ class SquadDataset(Dataset):
     def __getitem__(self, idx):
         return self.examples[idx]
 
-# Initialize tokenizer and model
-tokenizer = BertTokenizerFast.from_pretrained('bert-large-uncased')
-model = BertForQuestionAnswering.from_pretrained('bert-large-uncased')
+# Define HighwayEncoder class
+class HighwayEncoder(nn.Module):
+    """Encode an input sequence using a highway network."""
+    def __init__(self, num_layers, hidden_size):
+        super(HighwayEncoder, self).__init__()
+        self.transforms = nn.ModuleList([nn.Linear(hidden_size, hidden_size)
+                                         for _ in range(num_layers)])
+        self.gates = nn.ModuleList([nn.Linear(hidden_size, hidden_size)
+                                    for _ in range(num_layers)])
+
+    def forward(self, x):
+        for gate, transform in zip(self.gates, self.transforms):
+            g = torch.sigmoid(gate(x))
+            t = F.relu(transform(x))
+            x = g * t + (1 - g) * x
+        return x
+
+# Define BertLinear_highway class
+class BertLinear_highway(nn.Module):
+    def __init__(self, model_name):
+        super(BertLinear_highway, self).__init__()
+        self.bert = BertModel.from_pretrained(model_name)
+        input_dim = self.bert.config.hidden_size  # Get hidden size from config
+        self.enc = HighwayEncoder(3, input_dim)
+        self.qa_outputs = nn.Linear(input_dim, 2)
+        
+    def forward(self, input_ids, attention_mask, token_type_ids, start_positions=None, end_positions=None):
+        outputs = self.bert(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+        )
+
+        sequence_output = outputs.last_hidden_state
+        sequence_output = self.enc(sequence_output)
+
+        logits = self.qa_outputs(sequence_output)
+        start_logits, end_logits = logits.split(1, dim=-1)
+        start_logits = start_logits.squeeze(-1)
+        end_logits = end_logits.squeeze(-1)
+
+        outputs = (start_logits, end_logits)
+        if start_positions is not None and end_positions is not None:
+            # Compute loss
+            loss_fct = CrossEntropyLoss()
+            start_loss = loss_fct(start_logits, start_positions)
+            end_loss = loss_fct(end_logits, end_positions)
+            total_loss = (start_loss + end_loss) / 2
+            outputs = (total_loss,) + outputs
+
+        return outputs  # (loss), start_logits, end_logits
+
+# Initialize tbertokenizer and model
+model_name = "-base-uncased"
+tokenizer = BertTokenizerFast.from_pretrained(model_name)
+model = BertLinear_highway(model_name=model_name)
+
+# Move model to device
 model.to(device)
 
 # Create datasets and dataloaders
 train_dataset = SquadDataset(train_data, tokenizer)
 dev_dataset = SquadDataset(dev_data, tokenizer)
 
+# Adjust batch size due to larger model size
 train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
 dev_loader = DataLoader(dev_dataset, batch_size=8)
 
@@ -117,13 +184,12 @@ dev_loader = DataLoader(dev_dataset, batch_size=8)
 optimizer = AdamW(model.parameters(), lr=3e-5)
 total_steps = len(train_loader) * 2  # 2 epochs
 scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=total_steps)
-scheduler = get_cosine_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=total_steps)
 
-epoch_num = 3
+epoch_num = 2
 best_loss = float("inf")  # Initialize best loss
 
 # Directory to save the best model
-best_model_directory = '../models/fine_tuned_model'
+best_model_directory = '../models/fine_tuned_model_bert'
 if not os.path.exists(best_model_directory):
     os.makedirs(best_model_directory)
 
@@ -141,13 +207,13 @@ for epoch in range(epoch_num):
         end_positions = batch['end_positions'].to(device)
 
         outputs = model(
-            input_ids,
+            input_ids=input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
             start_positions=start_positions,
             end_positions=end_positions
         )
-        loss = outputs.loss
+        loss = outputs[0]
         loss.backward()
         optimizer.step()
         scheduler.step()
@@ -158,17 +224,18 @@ for epoch in range(epoch_num):
         # Save the model if this is the lowest loss observed so far
         if current_loss < best_loss:
             best_loss = current_loss
-            model.save_pretrained(best_model_directory)
+            model_save_path = os.path.join(best_model_directory, 'model.pt')
+            torch.save(model.state_dict(), model_save_path)
             tokenizer.save_pretrained(best_model_directory)
             print(f"New best model saved with loss {best_loss:.4f} at {best_model_directory}")
 
-# Define a directory to save the final model and tokenizer
-final_save_directory = '../models/fine_tuned_model'
+# Save the final model
+final_save_directory = '../models/fine_tuned_model_bert'
 if not os.path.exists(final_save_directory):
     os.makedirs(final_save_directory)
 
-# Save the final model
-model.save_pretrained(final_save_directory)
+model_save_path = os.path.join(final_save_directory, 'model.pt')
+torch.save(model.state_dict(), model_save_path)
 tokenizer.save_pretrained(final_save_directory)
 
 print(f'Model and tokenizer saved to {final_save_directory}')
@@ -192,16 +259,15 @@ with torch.no_grad():
         input_ids = inputs['input_ids'].to(device)
         attention_mask = inputs['attention_mask'].to(device)
         token_type_ids = inputs['token_type_ids'].to(device)
-        outputs = model(
-            input_ids,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids
-        )
-        start_logits = outputs.start_logits
-        end_logits = outputs.end_logits
         offset_mapping = inputs['offset_mapping']
         sample_mapping = inputs['overflow_to_sample_mapping']
 
+        outputs = model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids
+        )
+        start_logits, end_logits = outputs
         # For each input
         for i in range(len(input_ids)):
             offsets = offset_mapping[i]
@@ -222,7 +288,7 @@ with torch.no_grad():
                     answer = context[offsets[start_index][0]:offsets[end_index][1]]
                     valid_answers.append({
                         'text': answer,
-                        'score': start_logit[start_index] + end_logit[end_index]
+                        'score': start_logit[start_index].item() + end_logit[end_index].item()
                     })
             if len(valid_answers) > 0:
                 best_answer = sorted(valid_answers, key=lambda x: x['score'], reverse=True)[0]['text']
@@ -230,8 +296,13 @@ with torch.no_grad():
                 best_answer = ''
             predictions[item['qid']] = best_answer
 
+# Ensure the eval directory exists
+eval_directory = '../eval'
+if not os.path.exists(eval_directory):
+    os.makedirs(eval_directory)
+
 # Save predictions to a JSON file
-with open('../eval/fine_tuned_predictions.json', 'w') as f:
+with open(os.path.join(eval_directory, 'fine_tuned_predictions_bert.json'), 'w') as f:
     json.dump(predictions, f)
 
-print('Predictions saved to fine_tuned_predictions.json')
+print('Predictions saved to fine_tuned_predictions_bert.json')

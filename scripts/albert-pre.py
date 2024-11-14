@@ -3,10 +3,13 @@
 import json
 import torch
 from torch.utils.data import Dataset, DataLoader
-from transformers import BertTokenizerFast, BertForQuestionAnswering, AdamW, get_linear_schedule_with_warmup, get_cosine_schedule_with_warmup
+from transformers import BertTokenizerFast, BertForQuestionAnswering, BertConfig, AdamW, get_linear_schedule_with_warmup, get_cosine_schedule_with_warmup
 from tqdm import tqdm
 import collections
 import os
+from safetensors.torch import load_file as safe_load_file
+from transformers import AlbertTokenizerFast, AlbertForQuestionAnswering
+
 
 # Check if GPU is available
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -100,80 +103,21 @@ class SquadDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.examples[idx]
+    
+    # Initialize tokenizer and model
+tokenizer = AlbertTokenizerFast.from_pretrained('../models/fine_tuned_albert_xlarge_nomix_model')
+model = AlbertForQuestionAnswering.from_pretrained('../models/fine_tuned_albert_xlarge_nomix_model')
 
-# Initialize tokenizer and model
-tokenizer = BertTokenizerFast.from_pretrained('bert-large-uncased')
-model = BertForQuestionAnswering.from_pretrained('bert-large-uncased')
+# Load the weights from model.safetensors
+# state_dict = safe_load_file('..models/fine_tuned_albert_xlarge_nomix_model/model.safetensors')
+
+# # Load the state dict into the model
+# model.load_state_dict(state_dict)
+
+# Move model to device
 model.to(device)
 
-# Create datasets and dataloaders
-train_dataset = SquadDataset(train_data, tokenizer)
-dev_dataset = SquadDataset(dev_data, tokenizer)
 
-train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
-dev_loader = DataLoader(dev_dataset, batch_size=8)
-
-# Set up optimizer and scheduler
-optimizer = AdamW(model.parameters(), lr=3e-5)
-total_steps = len(train_loader) * 2  # 2 epochs
-scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=total_steps)
-scheduler = get_cosine_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=total_steps)
-
-epoch_num = 3
-best_loss = float("inf")  # Initialize best loss
-
-# Directory to save the best model
-best_model_directory = '../models/fine_tuned_model'
-if not os.path.exists(best_model_directory):
-    os.makedirs(best_model_directory)
-
-# Training loop
-model.train()
-for epoch in range(epoch_num):
-    print(f'Epoch {epoch + 1}/{epoch_num}')
-    loop = tqdm(train_loader, leave=True)
-    for batch in loop:
-        optimizer.zero_grad()
-        input_ids = batch['input_ids'].to(device)
-        attention_mask = batch['attention_mask'].to(device)
-        token_type_ids = batch['token_type_ids'].to(device)
-        start_positions = batch['start_positions'].to(device)
-        end_positions = batch['end_positions'].to(device)
-
-        outputs = model(
-            input_ids,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            start_positions=start_positions,
-            end_positions=end_positions
-        )
-        loss = outputs.loss
-        loss.backward()
-        optimizer.step()
-        scheduler.step()
-
-        current_loss = loss.item()
-        loop.set_postfix(loss=current_loss)
-        
-        # Save the model if this is the lowest loss observed so far
-        if current_loss < best_loss:
-            best_loss = current_loss
-            model.save_pretrained(best_model_directory)
-            tokenizer.save_pretrained(best_model_directory)
-            print(f"New best model saved with loss {best_loss:.4f} at {best_model_directory}")
-
-# Define a directory to save the final model and tokenizer
-final_save_directory = '../models/fine_tuned_model'
-if not os.path.exists(final_save_directory):
-    os.makedirs(final_save_directory)
-
-# Save the final model
-model.save_pretrained(final_save_directory)
-tokenizer.save_pretrained(final_save_directory)
-
-print(f'Model and tokenizer saved to {final_save_directory}')
-
-# Prediction code and saving predictions to JSON
 model.eval()
 predictions = collections.OrderedDict()
 with torch.no_grad():
@@ -231,7 +175,7 @@ with torch.no_grad():
             predictions[item['qid']] = best_answer
 
 # Save predictions to a JSON file
-with open('../eval/fine_tuned_predictions.json', 'w') as f:
+with open('../eval/fine_tuned_predictions_albert_new.json', 'w') as f:
     json.dump(predictions, f)
 
 print('Predictions saved to fine_tuned_predictions.json')
